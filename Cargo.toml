@@ -1,0 +1,26 @@
+[package]
+name = "od-get"
+version = "0.0.0"
+authors = ["Bernd-L <git@bernd.pw>"]
+edition = "2018"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Bernd-L/od-get"
+homepage = "https://github.com/Bernd-L/od-get#readme"
+readme = "README.md"
+documentation = "https://docs.rs/od-get"
+description = "A Rust tool for recursively crawling & downloading data from open directories"
+include = ["/README.md", "/LICENSE.md", "/Cargo.toml", "/Cargo.lock", "/src"]
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+regex = "1"
+anyhow = "1.0"
+clap = "2.33.2"
+chrono = "0.4.13"
+scraper = "0.12.0"
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+reqwest = { version = "0.10", features = ["json"] }
