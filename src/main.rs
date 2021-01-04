@@ -1,7 +1,8 @@
 pub(crate) mod cli;
 pub(crate) mod constants;
+pub(crate) mod download;
 
-pub fn main() {
+fn main() {
     // The working directory
     let pwd = std::env::current_dir()
         .unwrap()
