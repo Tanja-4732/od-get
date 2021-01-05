@@ -17,7 +17,7 @@ fn main() {
     println!("{}\n", constants::LICENSE);
 
     let cli_options = cli::get_options(matches).expect(
-        "Invalid arguments (skip & limit must be numbers and the working directory must exist",
+        "Invalid arguments (skip & limit must be numbers and the working directory must exist)",
     );
 
     // TODO do stuff

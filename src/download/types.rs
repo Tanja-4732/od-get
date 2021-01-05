@@ -1,22 +1,22 @@
 pub struct UrlData {
-    path: String,
-    files: Vec<FileData>,
-    sub_dirs: Vec<DirData>,
+    pub path: String,
+    pub files: Vec<FileData>,
+    pub sub_dirs: Vec<DirData>,
 }
 
 pub struct FileData {
-    url: String,
-    name: String,
-    last_modified: String,
-    size: String,
-    destination: Option<String>,
+    pub url: String,
+    pub name: String,
+    pub last_modified: String,
+    pub size: String,
+    pub description: String,
 }
 
 pub struct DirData {
-    url: String,
-    name: String,
-    last_modified: String,
-    destination: Option<String>,
+    pub url: String,
+    pub name: String,
+    pub last_modified: String,
+    pub description: String,
 }
 
 impl UrlData {
