@@ -18,3 +18,13 @@ pub struct DirData {
     last_modified: String,
     destination: Option<String>,
 }
+
+impl UrlData {
+    pub fn new(path: String) -> Self {
+        UrlData {
+            path,
+            files: vec![],
+            sub_dirs: vec![],
+        }
+    }
+}
