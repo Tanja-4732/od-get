@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'od-get'",
+      "cargo": {
+        "args": ["build", "--bin=od-get", "--package=od-get"],
+        "filter": {
+          "name": "od-get",
+          "kind": "bin"
+        }
+      },
+      "args": ["https://example.com/wp-content/gallery/some-folder/"],
+      "cwd": "${workspaceFolder}/downloads"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'od-get'",
+      "cargo": {
+        "args": ["test", "--no-run", "--bin=od-get", "--package=od-get"],
+        "filter": {
+          "name": "od-get",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
