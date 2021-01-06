@@ -7,7 +7,7 @@ pub struct DirData {
 
 #[derive(Debug)]
 pub struct FileLinkMetaData {
-    pub url: String,
+    pub url: reqwest::Url,
     pub name: String,
     pub last_modified: String,
     pub size: String,
@@ -16,7 +16,7 @@ pub struct FileLinkMetaData {
 
 #[derive(Debug)]
 pub struct DirLinkMetaData {
-    pub url: String,
+    pub url: reqwest::Url,
     pub name: String,
     pub last_modified: String,
     pub description: String,

@@ -25,10 +25,17 @@ async fn main() -> Result<()> {
 
     println!("{:?}", &cli_options);
 
+    // Make a new client
+    let client = reqwest::Client::new();
+
     // Crawl the root directory
-    let root = download::crawler::get_root_dir(&cli_options.url).await?;
+    let root = download::crawler::get_root_dir(&cli_options.url, &client).await?;
 
     println!("{:?}", &root);
+
+    let path = std::path::Path::new(&cli_options.destination);
+
+    download::crawler::download_files(&path, &root.files, &client).await?;
 
     Ok(())
 }

@@ -2,10 +2,11 @@ use crate::constants;
 use clap::{App, Arg, ArgMatches};
 use core::panic;
 use regex::Regex;
+use reqwest::Url;
 
 #[derive(Debug)]
 pub struct CliOptions {
-    pub url: String,
+    pub url: Url,
     pub destination: String,
     pub no_download: bool,
     pub verbosity: u64,
@@ -79,7 +80,7 @@ pub fn get_options(matches: ArgMatches) -> Result<CliOptions, anyhow::Error> {
     };
 
     Ok(CliOptions {
-        url: matches.value_of("URL").unwrap().to_owned(),
+        url: Url::parse(matches.value_of("URL").unwrap())?,
         destination: matches.value_of("destination").unwrap().to_owned(),
         no_download: matches.is_present("disable download"),
         verbosity: matches.occurrences_of("verbosity"),
