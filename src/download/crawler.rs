@@ -44,7 +44,10 @@ pub fn extract_from_html(html_string: &str) -> Result<types::DirData> {
         // Get an iterator over the elements of the row
         let mut row = row.children().skip(1);
 
-        let a = row.next().unwrap().first_child().unwrap();
+        let a = match row.next() {
+            Some(element) => element.first_child().unwrap(),
+            None => break,
+        };
 
         let href = a
             .value()
@@ -179,4 +182,21 @@ pub async fn download_files(
     }
 
     Ok(())
+}
+
+pub async fn depth_first_crawl() {}
+
+// pub async fn breadth_first_crawl(root_dir_data: &mut types::DirData, client: &reqwest::Client) {
+//     expand_tree(root_dir_data, client);
+
+// }
+
+pub async fn get_root_dir(url: &str) -> Result<types::DirData> {
+    let client = reqwest::Client::new();
+
+    let res = client.get(url).send().await.unwrap().text().await.unwrap();
+
+    let dir_data = extract_from_html(&res)?;
+
+    Ok(dir_data)
 }

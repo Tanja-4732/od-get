@@ -2,7 +2,10 @@ pub(crate) mod cli;
 pub(crate) mod constants;
 pub(crate) mod download;
 
-fn main() {
+use anyhow::Result;
+
+#[tokio::main]
+async fn main() -> Result<()> {
     // The working directory
     let pwd = std::env::current_dir()
         .unwrap()
@@ -20,6 +23,12 @@ fn main() {
         "Invalid arguments (skip & limit must be numbers and the working directory must exist)",
     );
 
-    // TODO do stuff
-    println!("{:?}", cli_options);
+    println!("{:?}", &cli_options);
+
+    // Crawl the root directory
+    let root = download::crawler::get_root_dir(&cli_options.url).await?;
+
+    println!("{:?}", &root);
+
+    Ok(())
 }

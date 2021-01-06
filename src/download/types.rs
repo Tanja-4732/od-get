@@ -1,9 +1,11 @@
+#[derive(Debug)]
 pub struct DirData {
     pub path: String,
     pub files: Vec<FileLinkMetaData>,
     pub sub_dirs: Vec<(DirLinkMetaData, Option<DirData>)>,
 }
 
+#[derive(Debug)]
 pub struct FileLinkMetaData {
     pub url: String,
     pub name: String,
@@ -12,6 +14,7 @@ pub struct FileLinkMetaData {
     pub description: String,
 }
 
+#[derive(Debug)]
 pub struct DirLinkMetaData {
     pub url: String,
     pub name: String,

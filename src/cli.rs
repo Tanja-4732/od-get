@@ -5,15 +5,15 @@ use regex::Regex;
 
 #[derive(Debug)]
 pub struct CliOptions {
-    url: String,
-    destination: String,
-    no_download: bool,
-    verbosity: u64,
-    limit_count: u64,
-    skip_count: u64,
-    recursion_limit: u64,
-    file_filter: Option<Regex>,
-    path_filter: Option<Regex>,
+    pub url: String,
+    pub destination: String,
+    pub no_download: bool,
+    pub verbosity: u64,
+    pub limit_count: u64,
+    pub skip_count: u64,
+    pub recursion_limit: u64,
+    pub file_filter: Option<Regex>,
+    pub path_filter: Option<Regex>,
 }
 
 pub fn configure_parser(default_path: &str) -> App {
