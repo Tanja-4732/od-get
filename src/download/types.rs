@@ -1,10 +1,10 @@
-pub struct UrlData {
+pub struct DirData {
     pub path: String,
-    pub files: Vec<FileData>,
-    pub sub_dirs: Vec<DirData>,
+    pub files: Vec<FileLinkMetaData>,
+    pub sub_dirs: Vec<(DirLinkMetaData, Option<DirData>)>,
 }
 
-pub struct FileData {
+pub struct FileLinkMetaData {
     pub url: String,
     pub name: String,
     pub last_modified: String,
@@ -12,16 +12,16 @@ pub struct FileData {
     pub description: String,
 }
 
-pub struct DirData {
+pub struct DirLinkMetaData {
     pub url: String,
     pub name: String,
     pub last_modified: String,
     pub description: String,
 }
 
-impl UrlData {
+impl DirData {
     pub fn new(path: String) -> Self {
-        UrlData {
+        DirData {
             path,
             files: vec![],
             sub_dirs: vec![],
