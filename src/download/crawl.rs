@@ -1,11 +1,8 @@
 use super::types;
 use anyhow::{bail, Result};
-use std::path::Path;
-// use chrono::prelude::Utc;
 use reqwest::{self, Url};
 use scraper::{Html, Selector};
 // use serde::Serialize;
-use tokio::{fs, io::AsyncWriteExt};
 
 // Make-shift errors
 const DIRECTORY_NOT_FOUND: &'static str = "Couldn't find the directory name";
@@ -52,9 +49,11 @@ pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<types::Dir
             None => break,
         };
 
-        let href = base_url
+        let mut href = base_url
             .join(a.value().as_element().unwrap().attr("href").unwrap())
             .to_owned()?;
+
+        clean_url(&mut href);
 
         let name = a
             .first_child()
@@ -143,46 +142,6 @@ pub async fn expand_tree(dir_data: &mut types::DirData, client: &reqwest::Client
     Ok(())
 }
 
-pub async fn download_files(
-    destination: &Path,
-    files: &Vec<types::FileLinkMetaData>,
-    client: &reqwest::Client,
-) -> Result<()> {
-    for file in files {
-        println!("Downloading file {}", file.name);
-
-        // Request the file from the server
-        let req = client.get(file.url.as_str()).send();
-
-        let mut res = req.await?;
-
-        let last_segment = res
-            .url()
-            .path_segments()
-            .and_then(|segments| segments.last())
-            .and_then(|name| if name.is_empty() { None } else { Some(name) })
-            .unwrap();
-        // TODO Maybe provide a fallback
-        // See https://rust-lang-nursery.github.io/rust-cookbook/web/clients/download.html
-
-        let file_path = destination.join(last_segment);
-
-        // Use Tokio to open the target file
-        let mut file_handle = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&file_path)
-            .await?;
-
-        // Write the file to disk in chunks as they arrive from the network
-        while let Some(chunk) = res.chunk().await? {
-            file_handle.write_all(&chunk).await?;
-        }
-    }
-
-    Ok(())
-}
-
 pub async fn depth_first_crawl() {}
 
 // pub async fn breadth_first_crawl(root_dir_data: &mut types::DirData, client: &reqwest::Client) {
@@ -203,4 +162,28 @@ pub async fn get_root_dir(url: &Url, client: &reqwest::Client) -> Result<types::
     let dir_data = extract_from_html(&res, url)?;
 
     Ok(dir_data)
+}
+
+/// Clear a lot of trailing slashes
+fn clean_url(url: &mut Url) -> () {
+    // TODO Improve this
+    url.path_segments_mut()
+        .expect("Cannot use URL")
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty()
+        .pop_if_empty();
 }

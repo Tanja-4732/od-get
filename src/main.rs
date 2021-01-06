@@ -3,6 +3,7 @@ pub(crate) mod constants;
 pub(crate) mod download;
 
 use anyhow::Result;
+use download::{crawl, fetch};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,13 +30,20 @@ async fn main() -> Result<()> {
     let client = reqwest::Client::new();
 
     // Crawl the root directory
-    let root = download::crawler::get_root_dir(&cli_options.url, &client).await?;
+    let mut root = crawl::get_root_dir(&cli_options.url, &client).await?;
+
+    // Expand the tree
+    crawl::expand_tree(&mut root, &client).await?;
 
     println!("{:?}", &root);
 
-    let path = std::path::Path::new(&cli_options.destination);
-
-    download::crawler::download_files(&path, &root.files, &client).await?;
+    fetch::download_recursive(
+        &root,
+        &cli_options,
+        &client,
+        &mut download::fetch::LimitCounts::new(),
+    )
+    .await?;
 
     Ok(())
 }
