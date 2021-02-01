@@ -17,10 +17,10 @@ include = ["/README.md", "/LICENSE.md", "/Cargo.toml", "/Cargo.lock", "/src"]
 [dependencies]
 regex = "1"
 anyhow = "1.0"
-clap = "2.33.2"
-chrono = "0.4.13"
+clap = "2.33.3"
+chrono = "0.4.19"
 scraper = "0.12.0"
 serde_json = "1.0"
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1.1.1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 reqwest = { version = "0.11", features = ["json"] }
