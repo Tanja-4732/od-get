@@ -1,4 +1,4 @@
-use super::types;
+use super::types::{DirLinkMetaData, FileLinkMetaData, Node};
 use anyhow::{bail, Result};
 use reqwest::{self, Url};
 use scraper::{Html, Selector};
@@ -11,10 +11,15 @@ const EMPTY_RESPONSE: &'static str = "Got a empty response";
 
 const EMPTY_SIZE_STRING: &'static str = "  - ";
 
-/// Parses a given HTML-string and extracts the directory and file paths.
-/// -  Not recursive
-/// -  Does not make requests
-pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<types::DirData> {
+/**
+Parses a given HTML-string and extracts the directory and file paths.
+
+-  Not recursive
+-  Does not make requests
+
+Returns a tuple containing the extracted name and the vector of extracted nodes.
+*/
+pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<(String, Vec<Node>)> {
     // let temp_url = Url::parse("/").expect("Invalid base");
     // let base_url = base_url.unwrap_or(&temp_url);
 
@@ -27,7 +32,7 @@ pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<types::Dir
         Some(element) => match element.text().next() {
             Some(text) => {
                 if text.starts_with("Index of ") {
-                    text.split_at(9).1
+                    text.split_at(9).1.to_owned()
                 } else {
                     bail!(CANNOT_PARSE_DIRECTORY)
                 }
@@ -37,7 +42,7 @@ pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<types::Dir
         None => bail!(DIRECTORY_NOT_FOUND),
     };
 
-    let mut data = types::DirData::new(dir_name.to_owned());
+    let mut nodes = vec![];
 
     // Iterate over every row
     for row in document.select(row_selector) {
@@ -95,35 +100,34 @@ pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<types::Dir
 
         // Check if the result is a directory
         if size == EMPTY_SIZE_STRING {
-            data.sub_dirs.push((
-                types::DirLinkMetaData {
-                    url: href,
-                    name,
-                    last_modified,
-                    description,
-                },
-                None,
-            ))
+            nodes.push(Node::PendingDir(DirLinkMetaData {
+                url: href,
+                name,
+                last_modified,
+                description,
+            }))
         } else {
-            data.files.push(types::FileLinkMetaData {
+            nodes.push(Node::File(FileLinkMetaData {
                 url: href,
                 name,
                 last_modified,
                 size,
                 description,
-            })
+            }))
         }
     }
 
-    Ok(data)
+    Ok((dir_name, nodes))
 }
 
-/// Takes a node (DirData) and crawls all its children (not recursive)
-pub async fn expand_tree(dir_data: &mut types::DirData, client: &reqwest::Client) -> Result<()> {
-    for sub_dir in &mut dir_data.sub_dirs {
+/**
+Expand all PengingDir nodes
+*/
+pub async fn expand_node(nodes: &mut Vec<Node>, client: &reqwest::Client) -> Result<()> {
+    for node in nodes {
         // Only crawl if needed
-        if sub_dir.1.is_none() {
-            let req = client.get(sub_dir.0.url.as_str()).send();
+        if let Node::PendingDir(dir) = node {
+            let req = client.get(dir.url.clone()).send();
 
             // Get the HTML from the server
             let html = match req.await {
@@ -132,9 +136,20 @@ pub async fn expand_tree(dir_data: &mut types::DirData, client: &reqwest::Client
             };
 
             // Perse the response
-            match extract_from_html(&html, &sub_dir.0.url) {
-                Ok(sub_dir_data) => sub_dir.1 = Some(sub_dir_data),
+            match extract_from_html(&html, &dir.url) {
                 Err(err) => bail!(err),
+                Ok(dir_data) => {
+                    // Replace the PendingDir node with a CrawledDir one
+                    *node = Node::CrawledDir(
+                        DirLinkMetaData {
+                            url: dir.url.clone(), // TODO remove copy
+                            name: dir_data.0,
+                            description: dir.description.clone(), // TODO remove copy
+                            last_modified: dir.last_modified.clone(), // TODO remove copy
+                        },
+                        dir_data.1,
+                    )
+                }
             };
         }
     }
@@ -142,14 +157,10 @@ pub async fn expand_tree(dir_data: &mut types::DirData, client: &reqwest::Client
     Ok(())
 }
 
-pub async fn depth_first_crawl() {}
-
-// pub async fn breadth_first_crawl(root_dir_data: &mut types::DirData, client: &reqwest::Client) {
-//     expand_tree(root_dir_data, client);
-
-// }
-
-pub async fn get_root_dir(url: &Url, client: &reqwest::Client) -> Result<types::DirData> {
+/**
+Extracts the HTML from the root URL and returns a node
+*/
+pub async fn get_root_dir(url: &Url, client: &reqwest::Client) -> Result<Node> {
     let res = client
         .get(url.as_str())
         .send()
@@ -159,9 +170,17 @@ pub async fn get_root_dir(url: &Url, client: &reqwest::Client) -> Result<types::
         .await
         .unwrap();
 
-    let dir_data = extract_from_html(&res, url)?;
+    let root_data = extract_from_html(&res, url)?;
 
-    Ok(dir_data)
+    Ok(Node::CrawledDir(
+        DirLinkMetaData {
+            url: url.clone(),
+            name: root_data.0,
+            description: String::new(),
+            last_modified: String::new(),
+        },
+        root_data.1,
+    ))
 }
 
 /// Clear a lot of trailing slashes

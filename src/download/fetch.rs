@@ -3,11 +3,13 @@ use crate::cli::CliOptions;
 use super::types;
 use anyhow::{bail, Result};
 use std::path::Path;
+use types::Node;
 // use chrono::prelude::Utc;
 use reqwest::{self, Url};
 // use serde::Serialize;
 use tokio::{fs, io::AsyncWriteExt};
 
+/// Several counter variables used to keep track of limits
 pub struct LimitCounts {
     recursion_depth: u64,
     file_count: u64,
@@ -26,7 +28,7 @@ impl LimitCounts {
 
 pub async fn download_files_to_dir(
     destination: &Path,
-    files: &Vec<types::FileLinkMetaData>,
+    files: &Vec<&types::FileLinkMetaData>,
     client: &reqwest::Client,
     options: Option<&CliOptions>,
     mut counters: Option<&mut LimitCounts>,
@@ -111,7 +113,7 @@ pub async fn download_files_to_dir(
 }
 
 pub async fn download_recursive(
-    root_dir: &types::DirData,
+    node: &Node,
     options: &CliOptions,
     client: &reqwest::Client,
     counters: &mut LimitCounts,
@@ -119,81 +121,86 @@ pub async fn download_recursive(
     // Pin<Box<dyn Future<Output = Result<()>>>>
     // Pin<Box<dyn Future<Output = ()>>>
 
-    // If no download is desired, skip the download
-    if options.no_download {
-        println!("Skipped download");
-        return Ok(());
-    };
-
-    // Increment the recursion depth
-    counters.recursion_depth += 1;
-
-    // The folder name from the server
-    let server_path = root_dir.path.split('/').last().expect("Can't split");
-
-    // Skip unwanted folders
-    if let Some(regex) = &options.path_filter {
-        if regex.is_match(&server_path) {
-            println!("(Filter) Skip directory {}", server_path);
+    if let Node::CrawledDir(meta, children) = node {
+        // If no download is desired, skip the download
+        if options.no_download {
+            println!("Skipped download");
             return Ok(());
-        }
-    }
+        };
 
-    // Only download wanted folders
-    if let Some(regex) = &options.path_matcher {
-        if !regex.is_match(&server_path) {
-            println!("(Matcher) Skip directory {}", server_path);
-            return Ok(());
-        }
-    }
+        // Increment the recursion depth
+        counters.recursion_depth += 1;
 
-    // Create the directory (if it doesn't exist)
-    let folder_path = Path::new(&options.destination).join(server_path);
-    fs::create_dir_all(&folder_path).await?;
+        // The folder name from the server
+        let server_path = meta.name.split('/').last().expect("Can't split");
 
-    // Download all the files (if they pass the filters)
-    download_files_to_dir(
-        &folder_path,
-        &root_dir.files,
-        client,
-        Some(options),
-        Some(counters),
-    )
-    .await?;
-
-    // Iterate over the sub directories
-    for directory in &root_dir.sub_dirs {
-        let dir = &directory.1;
-        if dir.is_some() {
-            // Stop if the recursion limit is reached
-            if let Some(rec_limit) = options.recursion_limit {
-                if counters.recursion_depth >= rec_limit {
-                    println!("Reached recursion limit at {}", counters.recursion_depth);
-                    return Ok(());
-                }
+        // Skip unwanted folders
+        if let Some(regex) = &options.path_filter {
+            if regex.is_match(&server_path) {
+                println!("(Filter) Skip directory {}", server_path);
+                return Ok(());
             }
-
-            if let Some(file_limit) = options.limit_count {
-                if counters.file_count >= file_limit {
-                    println!("File limit reached at {} files", counters.file_count);
-                    return Ok(());
-                }
-            }
-
-            // TODO await the recursion
-            // download_recursive(root_dir, options, client, counters).await?;
-
-            // Start the next recursive iteration
-            download_recursive(root_dir, options, client, counters);
-        } else {
-            bail!(
-                "Directory not initialized: {}",
-                get_last_segment(&directory.0.url)
-            );
         }
-    }
 
-    return Ok(());
+        // Only download wanted folders
+        if let Some(regex) = &options.path_matcher {
+            if !regex.is_match(&server_path) {
+                println!("(Matcher) Skip directory {}", server_path);
+                return Ok(());
+            }
+        }
+
+        // Create the directory (if it doesn't exist)
+        let folder_path = Path::new(&options.destination).join(server_path);
+        fs::create_dir_all(&folder_path).await?;
+
+        // Make a list of files
+        let mut files = vec![];
+
+        for node in children {
+            if let Node::File(file) = node {
+                files.push(file);
+            }
+        }
+
+        // Download all the files (if they pass the filters)
+        download_files_to_dir(&folder_path, &files, client, Some(options), Some(counters)).await?;
+
+        // Iterate over the sub directories
+        for directory in children {
+            if let Node::CrawledDir(sub_meta, _) = directory {
+                // Stop if the recursion limit is reached
+                if let Some(rec_limit) = options.recursion_limit {
+                    if counters.recursion_depth >= rec_limit {
+                        println!("Reached recursion limit at {}", counters.recursion_depth);
+                        return Ok(());
+                    }
+                }
+
+                if let Some(file_limit) = options.limit_count {
+                    if counters.file_count >= file_limit {
+                        println!("File limit reached at {} files", counters.file_count);
+                        return Ok(());
+                    }
+                }
+
+                // TODO await the recursion
+                // download_recursive(directory, options, client, counters).await;
+
+                // Start the next recursive iteration
+                download_recursive(directory, options, client, counters);
+            } else if let Node::PendingDir(directory) = directory {
+                bail!(
+                    "Directory not initialized: {}",
+                    get_last_segment(&directory.url)
+                );
+            }
+        }
+
+        Ok(())
+    } else {
+        bail!("Cannot work with pending directory")
+    }
 }
 
 /// Returns a reference to the last segment of a given URL as a &str

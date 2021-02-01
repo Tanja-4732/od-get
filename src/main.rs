@@ -3,7 +3,7 @@ pub(crate) mod constants;
 pub(crate) mod download;
 
 use anyhow::Result;
-use download::{crawl, fetch};
+use download::{crawl, fetch, types::Node};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -33,7 +33,11 @@ async fn main() -> Result<()> {
     let mut root = crawl::get_root_dir(&cli_options.url, &client).await?;
 
     // Expand the tree
-    crawl::expand_tree(&mut root, &client).await?;
+    if let Node::CrawledDir(_, ref mut children) = root {
+        crawl::expand_node(children, &client).await?;
+    } else {
+        panic!("Cannot expand root node")
+    }
 
     println!("{:?}", &root);
 
