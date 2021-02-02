@@ -127,6 +127,7 @@ pub async fn expand_node(nodes: &mut Vec<Node>, client: &reqwest::Client) -> Res
     for node in nodes {
         // Only crawl if needed
         if let Node::PendingDir(dir) = node {
+            println!("Now crawling: {}", dir.name);
             let req = client.get(dir.url.clone()).send();
 
             // Get the HTML from the server
@@ -161,6 +162,8 @@ pub async fn expand_node(nodes: &mut Vec<Node>, client: &reqwest::Client) -> Res
 Extracts the HTML from the root URL and returns a node
 */
 pub async fn get_root_dir(url: &Url, client: &reqwest::Client) -> Result<Node> {
+    println!("Crawling root URL");
+
     let res = client
         .get(url.as_str())
         .send()

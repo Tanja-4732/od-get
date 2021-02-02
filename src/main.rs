@@ -3,7 +3,11 @@ pub(crate) mod constants;
 pub(crate) mod download;
 
 use anyhow::Result;
-use download::{crawl, fetch, types::Node};
+use download::{
+    crawl,
+    fetch::{self, DownloadRecursiveStatus},
+    types::Node,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -24,8 +28,6 @@ async fn main() -> Result<()> {
         "Invalid arguments (skip & limit must be numbers and the working directory must exist)",
     );
 
-    println!("{:?}", &cli_options);
-
     // Make a new client
     let client = reqwest::Client::new();
 
@@ -39,15 +41,18 @@ async fn main() -> Result<()> {
         panic!("Cannot expand root node")
     }
 
-    println!("{:?}", &root);
+    let mut counters = download::fetch::LimitCounts::new();
 
-    fetch::download_recursive(
-        &root,
-        &cli_options,
-        &client,
-        &mut download::fetch::LimitCounts::new(),
-    )
-    .await?;
+    let mut res = { fetch::download_recursive(&root, &cli_options, &client, &mut counters).await? };
+
+    let mut counters = counters.clone();
+
+    while let DownloadRecursiveStatus::Do(ref to_do) = res {
+        for task in to_do {
+            let (node, options, client) = task;
+            res = fetch::download_recursive(node, options, client, &mut counters).await?;
+        }
+    }
 
     Ok(())
 }

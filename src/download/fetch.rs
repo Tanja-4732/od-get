@@ -2,7 +2,7 @@ use crate::cli::CliOptions;
 
 use super::types;
 use anyhow::{bail, Result};
-use std::path::Path;
+use std::{future::Future, path::Path};
 use types::Node;
 // use chrono::prelude::Utc;
 use reqwest::{self, Url};
@@ -10,6 +10,7 @@ use reqwest::{self, Url};
 use tokio::{fs, io::AsyncWriteExt};
 
 /// Several counter variables used to keep track of limits
+#[derive(Debug, Clone)]
 pub struct LimitCounts {
     recursion_depth: u64,
     file_count: u64,
@@ -24,6 +25,11 @@ impl LimitCounts {
             skipped_files: 0,
         }
     }
+}
+
+pub enum DownloadRecursiveStatus<'a> {
+    Done,
+    Do(Vec<(&'a Node, &'a CliOptions, &'a reqwest::Client)>),
 }
 
 pub async fn download_files_to_dir(
@@ -112,12 +118,13 @@ pub async fn download_files_to_dir(
     Ok(())
 }
 
-pub async fn download_recursive(
-    node: &Node,
-    options: &CliOptions,
-    client: &reqwest::Client,
-    counters: &mut LimitCounts,
-) -> Result<()> {
+pub async fn download_recursive<'a>(
+    node: &'a Node,
+    options: &'a CliOptions,
+    client: &'a reqwest::Client,
+    counters: &'a mut LimitCounts,
+) -> Result<DownloadRecursiveStatus<'a>> {
+    // ) -> Box<dyn Future<Output = ()>> {
     // Pin<Box<dyn Future<Output = Result<()>>>>
     // Pin<Box<dyn Future<Output = ()>>>
 
@@ -125,7 +132,7 @@ pub async fn download_recursive(
         // If no download is desired, skip the download
         if options.no_download {
             println!("Skipped download");
-            return Ok(());
+            return Ok(DownloadRecursiveStatus::Done);
         };
 
         // Increment the recursion depth
@@ -138,7 +145,7 @@ pub async fn download_recursive(
         if let Some(regex) = &options.path_filter {
             if regex.is_match(&server_path) {
                 println!("(Filter) Skip directory {}", server_path);
-                return Ok(());
+                return Ok(DownloadRecursiveStatus::Done);
             }
         }
 
@@ -146,7 +153,7 @@ pub async fn download_recursive(
         if let Some(regex) = &options.path_matcher {
             if !regex.is_match(&server_path) {
                 println!("(Matcher) Skip directory {}", server_path);
-                return Ok(());
+                return Ok(DownloadRecursiveStatus::Done);
             }
         }
 
@@ -166,6 +173,9 @@ pub async fn download_recursive(
         // Download all the files (if they pass the filters)
         download_files_to_dir(&folder_path, &files, client, Some(options), Some(counters)).await?;
 
+        // A list of tuples containing arguments which which this function should be called again
+        let mut to_do = vec![];
+
         // Iterate over the sub directories
         for directory in children {
             if let Node::CrawledDir(sub_meta, _) = directory {
@@ -173,22 +183,24 @@ pub async fn download_recursive(
                 if let Some(rec_limit) = options.recursion_limit {
                     if counters.recursion_depth >= rec_limit {
                         println!("Reached recursion limit at {}", counters.recursion_depth);
-                        return Ok(());
+                        return Ok(DownloadRecursiveStatus::Done);
                     }
                 }
 
                 if let Some(file_limit) = options.limit_count {
                     if counters.file_count >= file_limit {
                         println!("File limit reached at {} files", counters.file_count);
-                        return Ok(());
+                        return Ok(DownloadRecursiveStatus::Done);
                     }
                 }
 
                 // TODO await the recursion
-                // download_recursive(directory, options, client, counters).await;
+                // (*(download_recursive(directory, options, client, counters).await))?;
 
                 // Start the next recursive iteration
-                download_recursive(directory, options, client, counters);
+                // download_recursive(directory, options, client, counters);
+                println!("recursive: {:?}", sub_meta.name);
+                to_do.push((directory, options, client));
             } else if let Node::PendingDir(directory) = directory {
                 bail!(
                     "Directory not initialized: {}",
@@ -197,7 +209,12 @@ pub async fn download_recursive(
             }
         }
 
-        Ok(())
+        // Return the to_do list of tuples containing arguments with which this function should be called again
+        if to_do.len() == 0 {
+            Ok(DownloadRecursiveStatus::Done)
+        } else {
+            Ok(DownloadRecursiveStatus::Do(to_do))
+        }
     } else {
         bail!("Cannot work with pending directory")
     }
