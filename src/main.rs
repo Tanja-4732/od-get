@@ -43,14 +43,25 @@ async fn main() -> Result<()> {
 
     let mut counters = download::fetch::LimitCounts::new();
 
-    let mut res = { fetch::download_recursive(&root, &cli_options, &client, &mut counters).await? };
+    let mut counters_1 = counters.clone();
 
-    let mut counters = counters.clone();
+    let res = fetch::download_recursive(&root, &cli_options, &client, &mut counters_1).await?;
 
-    while let DownloadRecursiveStatus::Do(ref to_do) = res {
+    // let mut counters = counters.clone();
+
+    // while let DownloadRecursiveStatus::Do(ref to_do) = res {
+    //     for task in to_do {
+    //         let (node, options, client) = task;
+    //         // res = fetch::download_recursive(node, options, client, &mut counters).await?;
+    //     }
+    // }
+
+    if let DownloadRecursiveStatus::Do(ref to_do) = res {
         for task in to_do {
             let (node, options, client) = task;
-            res = fetch::download_recursive(node, options, client, &mut counters).await?;
+            // TODO implement more than one level of recursion
+            // res = fetch::download_recursive(node, options, client, &mut counters).await?;
+            fetch::download_recursive(node, options, client, &mut counters).await?;
         }
     }
 

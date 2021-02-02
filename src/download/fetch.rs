@@ -194,16 +194,14 @@ pub async fn download_recursive<'a>(
                     }
                 }
 
-                // TODO await the recursion
+                // TODO await the recursion (or maybe keep the return vector)
                 // (*(download_recursive(directory, options, client, counters).await))?;
 
                 // Start the next recursive iteration
-                // download_recursive(directory, options, client, counters);
-                println!("recursive: {:?}", sub_meta.name);
                 to_do.push((directory, options, client));
             } else if let Node::PendingDir(directory) = directory {
-                bail!(
-                    "Directory not initialized: {}",
+                println!(
+                    "(Skip) Directory not initialized: {}",
                     get_last_segment(&directory.url)
                 );
             }
@@ -225,7 +223,10 @@ fn get_last_segment(url: &Url) -> &str {
     url.path_segments()
         .and_then(|segments| segments.last())
         .and_then(|name| if name.is_empty() { None } else { Some(name) })
-        .unwrap_or_else(|| panic!("Cannot parse last segment of url: {}", url))
+        .unwrap_or_else(|| {
+            (url.clone().path_segments_mut().unwrap().pop_if_empty());
+            get_last_segment(url)
+        })
 
     // TODO Maybe provide a fallback
     // See https://rust-lang-nursery.github.io/rust-cookbook/web/clients/download.html

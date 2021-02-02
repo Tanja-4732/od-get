@@ -5,7 +5,8 @@ use scraper::{Html, Selector};
 // use serde::Serialize;
 
 // Make-shift errors
-const DIRECTORY_NOT_FOUND: &'static str = "Couldn't find the directory name";
+const DIRECTORY_NOT_FOUND_1: &'static str = "Couldn't find the directory name_1";
+const DIRECTORY_NOT_FOUND_2: &'static str = "Couldn't find the directory name_2";
 const CANNOT_PARSE_DIRECTORY: &'static str = "Couldn't parse the directory name";
 const EMPTY_RESPONSE: &'static str = "Got a empty response";
 
@@ -37,9 +38,9 @@ pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<(String, V
                     bail!(CANNOT_PARSE_DIRECTORY)
                 }
             }
-            None => bail!(DIRECTORY_NOT_FOUND),
+            None => bail!(DIRECTORY_NOT_FOUND_1),
         },
-        None => bail!(DIRECTORY_NOT_FOUND),
+        None => bail!(DIRECTORY_NOT_FOUND_2),
     };
 
     let mut nodes = vec![];
@@ -100,6 +101,8 @@ pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<(String, V
 
         // Check if the result is a directory
         if size == EMPTY_SIZE_STRING {
+            println!("Got directory ({:4}): {}", nodes.len(), &name);
+
             nodes.push(Node::PendingDir(DirLinkMetaData {
                 url: href,
                 name,
@@ -107,6 +110,9 @@ pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<(String, V
                 description,
             }))
         } else {
+            println!("Got file ({:4}): {}", nodes.len(), &name);
+            println!("{}\n", &href);
+
             nodes.push(Node::File(FileLinkMetaData {
                 url: href,
                 name,
@@ -114,6 +120,11 @@ pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<(String, V
                 size,
                 description,
             }))
+        }
+
+        // TODO remove this
+        if nodes.len() == 20 {
+            break;
         }
     }
 
@@ -162,7 +173,7 @@ pub async fn expand_node(nodes: &mut Vec<Node>, client: &reqwest::Client) -> Res
 Extracts the HTML from the root URL and returns a node
 */
 pub async fn get_root_dir(url: &Url, client: &reqwest::Client) -> Result<Node> {
-    println!("Crawling root URL");
+    println!("Fetching root HTML");
 
     let res = client
         .get(url.as_str())
@@ -172,6 +183,8 @@ pub async fn get_root_dir(url: &Url, client: &reqwest::Client) -> Result<Node> {
         .text()
         .await
         .unwrap();
+
+    println!("Crawling root URL");
 
     let root_data = extract_from_html(&res, url)?;
 
