@@ -157,8 +157,28 @@ pub async fn download_recursive<'a>(
             }
         }
 
+        let mut url = options.url.clone();
+        url.path_segments_mut()
+            .unwrap()
+            // TODO improve this somehow
+            .pop_if_empty()
+            .pop_if_empty()
+            .pop_if_empty()
+            .pop_if_empty()
+            .pop_if_empty()
+            .pop_if_empty()
+            .pop_if_empty()
+            .pop_if_empty();
+
+        let last_segment = url.path_segments().unwrap().last().unwrap();
+
         // Create the directory (if it doesn't exist)
-        let folder_path = Path::new(&options.destination).join(server_path);
+        let folder_path = Path::new(&options.destination)
+            .join(last_segment)
+            .join(server_path);
+
+        println!("{}", folder_path.to_str().unwrap());
+
         fs::create_dir_all(&folder_path).await?;
 
         // Make a list of files
@@ -224,6 +244,7 @@ fn get_last_segment(url: &Url) -> &str {
         .and_then(|segments| segments.last())
         .and_then(|name| if name.is_empty() { None } else { Some(name) })
         .unwrap_or_else(|| {
+            // TODO this might need to be fixed
             (url.clone().path_segments_mut().unwrap().pop_if_empty());
             get_last_segment(url)
         })
