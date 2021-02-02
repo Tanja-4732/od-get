@@ -12,7 +12,13 @@
           "kind": "bin"
         }
       },
-      "args": ["https://example.com/wp-content/gallery/some-folder/"],
+      "args": [
+        "https://example.com/wp-content/gallery/some-folder/",
+        "-p",
+        "^(cache|dynamic|thumbs)$",
+        "-f",
+        "_backup$"
+      ],
       "cwd": "${workspaceFolder}/downloads"
     },
     {
