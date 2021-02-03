@@ -655,6 +655,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
+ "lazy_static",
  "regex",
  "reqwest",
  "scraper",

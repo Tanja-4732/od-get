@@ -2,8 +2,20 @@
 
 A Rust tool for recursively crawling & downloading data from [open directories](https://www.vice.com/en/article/d35x57/what-are-open-directories)
 
-- Multi threaded
-- Customizable
-- Filtering (regex) support
+- [x] Filtering (regex) support
+  - [x] Exclude file patterns
+  - [x] Include file patterns
+  - [x] Exclude folder patterns
+  - [x] Include folder patterns
+- [x] Customizable output
+  - [x] Target directory
+  - [ ] Verbosity
+  - [ ] JSON file generation
+  - [ ] Log file/dynamic terminal output
+- [ ] Customizable limits
+  - [ ] recursion depth limit
+  - [ ] file count limit
+  - [ ] file count offset (skip `n` files)
+- [ ] Multi threaded
 
-(work in progress)
+(work in progress, one layer of recursion works)
