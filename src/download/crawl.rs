@@ -59,7 +59,7 @@ pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<(String, V
             .join(a.value().as_element().unwrap().attr("href").unwrap())
             .to_owned()?;
 
-        clean_url(&mut href);
+        // clean_url(&mut href);
 
         let name = a
             .first_child()
@@ -110,6 +110,8 @@ pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<(String, V
                 description,
             }))
         } else {
+            clean_url(&mut href);
+
             println!("Got file ({:4}): {}", nodes.len(), &name);
             println!("{}\n", &href);
 

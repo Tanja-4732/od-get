@@ -220,10 +220,22 @@ pub async fn download_recursive<'a>(
                 // Start the next recursive iteration
                 to_do.push((directory, options, client));
             } else if let Node::PendingDir(directory) = directory {
-                println!(
-                    "(Skip) Directory not initialized: {}",
-                    get_last_segment(&directory.url)
-                );
+                let mut url = directory.url.clone();
+                url.path_segments_mut()
+                    .unwrap()
+                    // TODO improve this somehow
+                    .pop_if_empty()
+                    .pop_if_empty()
+                    .pop_if_empty()
+                    .pop_if_empty()
+                    .pop_if_empty()
+                    .pop_if_empty()
+                    .pop_if_empty()
+                    .pop_if_empty();
+
+                let last_segment = url.path_segments().unwrap().last().unwrap();
+
+                println!("(Skip) Directory not initialized: {}", last_segment);
             }
         }
 
@@ -239,14 +251,16 @@ pub async fn download_recursive<'a>(
 }
 
 /// Returns a reference to the last segment of a given URL as a &str
+#[deprecated]
 fn get_last_segment(url: &Url) -> &str {
     url.path_segments()
         .and_then(|segments| segments.last())
         .and_then(|name| if name.is_empty() { None } else { Some(name) })
         .unwrap_or_else(|| {
             // TODO this might need to be fixed
-            (url.clone().path_segments_mut().unwrap().pop_if_empty());
-            get_last_segment(url)
+            // (url.clone().path_segments_mut().unwrap().pop_if_empty());
+            // get_last_segment(url);
+            return "unknown_segment";
         })
 
     // TODO Maybe provide a fallback
