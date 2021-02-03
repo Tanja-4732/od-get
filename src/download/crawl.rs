@@ -1,5 +1,6 @@
 use super::types::{DirLinkMetaData, FileLinkMetaData, Node};
 use anyhow::{anyhow, bail, Result};
+use html_escape::{decode_html_entities_to_string, decode_html_entities_to_vec};
 use lazy_static::lazy_static;
 use rayon::prelude::*;
 use regex::Regex;
@@ -24,16 +25,16 @@ pub const POS_DESC: usize = 5;
 lazy_static! {
     /// This is an example for using doc comment attributes
     static ref RX_MAIN: Regex = Regex::new(
-        "^<tr><td valign=\"top\">&nbsp;<\\/td><td><a href=\"(.+?)\">(.+?)<\\/a><\\/td><td align=\"right\">(.+?)  <\\/td><td align=\"right\">(  - )?<\\/td><td>(.+?)<\\/td><\\/tr>$"
+        "</td><td><a href=\"(.+?)\">(.+?)</a></td><td align=\"right\">(.+?)  </td><td align=\"right\">(.+?)</td><td>(.+?)</td></tr>"
     ).unwrap();
 
     /// This is an example for using doc comment attributes
     static ref RX_PARENT: Regex = Regex::new(
-        "^<tr><td valign=\"top\">&nbsp;<\\/td><td><a href=\"\\/(.+?)\\/\">Parent Directory<\\/a>       <\\/td><td>&nbsp;<\\/td><td align=\"right\">  - <\\/td><td>&nbsp;<\\/td><\\/tr>$"
+        "</td><td><a href=\"/(.+?)/\">Parent Directory</a>       </td><td> </td><td align=\"right\">  - </td><td> </td></tr>"
     ).unwrap();
 
     /// This is an example for using doc comment attributes
-    static ref RX_TITLE: Regex = Regex::new("^<h1>Index of (.+?)<\\/h1>$").unwrap();
+    static ref RX_TITLE: Regex = Regex::new("<h1>Index of (.+?)</h1>").unwrap();
 }
 
 /**
@@ -62,15 +63,11 @@ pub fn cheap_extract_from_html(html: &str, base_url: &Url) -> Result<(String, Ve
     // TODO maybe use the parent_href in the future
     // let parent_href = get_first(html, &RX_PARENT)?;
 
+    // Split the string into lines
     let nodes = html
         .par_lines()
         .filter_map(cheap_process_row(base_url))
         .collect();
-
-    // Split the string into lines
-
-    tokio::spawn(async move { // Multi-threaded open
-    }); // Multi-threaded close
 
     Ok((dir_name.to_owned(), nodes))
 }
@@ -296,7 +293,7 @@ pub async fn expand_node(nodes: &mut Vec<Node>, client: &reqwest::Client) -> Res
 
             // Get the HTML from the server
             let html = match req.await {
-                Ok(res) => res.text().await.expect(EMPTY_RESPONSE),
+                Ok(res) => sanitize_html(&res.text().await.expect(EMPTY_RESPONSE))?,
                 Err(err) => bail!(err),
             };
 
@@ -337,9 +334,12 @@ pub async fn get_root_dir(url: &Url, client: &reqwest::Client) -> Result<Node> {
         .await
         .unwrap();
 
+    // Sanitize the HTML
+    let html = sanitize_html(&res)?;
+
     println!("Crawling root URL");
 
-    let root_data = cheap_extract_from_html(&res, url)?;
+    let root_data = cheap_extract_from_html(&html, url)?;
 
     Ok(Node::CrawledDir(
         DirLinkMetaData {
@@ -350,6 +350,15 @@ pub async fn get_root_dir(url: &Url, client: &reqwest::Client) -> Result<Node> {
         },
         root_data.1,
     ))
+}
+
+/**
+Sanitize the HTML (use String::from_utf8 to check for valid UTF-8, the library is unsafe)
+*/
+pub fn sanitize_html(text: &str) -> Result<String> {
+    let mut output = Vec::new();
+    decode_html_entities_to_vec(text, &mut output);
+    Ok(String::from_utf8(output)?)
 }
 
 /// Clear a lot of trailing slashes

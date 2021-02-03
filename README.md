@@ -16,6 +16,6 @@ A Rust tool for recursively crawling & downloading data from [open directories](
   - [ ] recursion depth limit
   - [ ] file count limit
   - [ ] file count offset (skip `n` files)
-- [ ] Multi threaded
+- [x] Multi threaded (using `rayon`)
 
 (work in progress, one layer of recursion works)
