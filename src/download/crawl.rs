@@ -1,5 +1,8 @@
 use super::types::{DirLinkMetaData, FileLinkMetaData, Node};
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
+use lazy_static::lazy_static;
+use rayon::prelude::*;
+use regex::Regex;
 use reqwest::{self, Url};
 use scraper::{ElementRef, Html, Selector};
 // use serde::Serialize;
@@ -12,6 +15,39 @@ const EMPTY_RESPONSE: &'static str = "Got a empty response";
 
 const EMPTY_SIZE_STRING: &'static str = "  - ";
 
+pub const POS_HREF: usize = 1;
+pub const POS_NAME: usize = 2;
+pub const POS_DATE: usize = 3;
+pub const POS_SIZE: usize = 4;
+pub const POS_DESC: usize = 5;
+
+lazy_static! {
+    /// This is an example for using doc comment attributes
+    static ref RX_MAIN: Regex = Regex::new(
+        "^<tr><td valign=\"top\">&nbsp;<\\/td><td><a href=\"(.+?)\">(.+?)<\\/a><\\/td><td align=\"right\">(.+?)  <\\/td><td align=\"right\">(  - )?<\\/td><td>(.+?)<\\/td><\\/tr>$"
+    ).unwrap();
+
+    /// This is an example for using doc comment attributes
+    static ref RX_PARENT: Regex = Regex::new(
+        "^<tr><td valign=\"top\">&nbsp;<\\/td><td><a href=\"\\/(.+?)\\/\">Parent Directory<\\/a>       <\\/td><td>&nbsp;<\\/td><td align=\"right\">  - <\\/td><td>&nbsp;<\\/td><\\/tr>$"
+    ).unwrap();
+
+    /// This is an example for using doc comment attributes
+    static ref RX_TITLE: Regex = Regex::new("^<h1>Index of (.+?)<\\/h1>$").unwrap();
+}
+
+/**
+Returns the first match in a string with a given Regex pattern
+*/
+fn get_first<'a>(text: &'a str, regex: &Regex) -> Result<&'a str> {
+    Ok(regex
+        .captures(text)
+        .ok_or(anyhow!(CANNOT_PARSE_DIRECTORY))?
+        .get(1)
+        .ok_or(anyhow!(CANNOT_PARSE_DIRECTORY))?
+        .as_str())
+}
+
 /**
 Parses a given HTML-string and extracts the directory and file paths.
 
@@ -20,15 +56,77 @@ Parses a given HTML-string and extracts the directory and file paths.
 
 Returns a tuple containing the extracted name and the vector of extracted nodes.
 */
-pub fn cheap_extract_from_html(html_string: &str, base_url: &Url) -> Result<(String, Vec<Node>)> {
-    unimplemented!()
+pub fn cheap_extract_from_html(html: &str, base_url: &Url) -> Result<(String, Vec<Node>)> {
+    let dir_name = get_first(html, &RX_TITLE)?;
+
+    // TODO maybe use the parent_href in the future
+    // let parent_href = get_first(html, &RX_PARENT)?;
+
+    let nodes = html
+        .par_lines()
+        .filter_map(cheap_process_row(base_url))
+        .collect();
+
+    // Split the string into lines
+
+    tokio::spawn(async move { // Multi-threaded open
+    }); // Multi-threaded close
+
+    Ok((dir_name.to_owned(), nodes))
 }
 
 /**
 Turns an ElementRef (of a HTML table-row into a node (Either PendingDir or File)
 */
-fn cheap_process_row(row: String, base_url: &Url) -> Result<Node> {
-    unimplemented!()
+pub fn cheap_process_row<'a>(
+    base_url: &'a Url,
+) -> Box<dyn Fn(&str) -> Option<Node> + Send + Sync + 'a> {
+    Box::new(move |line| {
+        let captures = RX_MAIN.captures(line)?;
+
+        // Calculate the absolute href using the base_url
+        let mut href = base_url
+            .join(captures.get(POS_HREF)?.as_str())
+            .to_owned()
+            .ok()?;
+
+        // The other values get extracted using the regex
+        let name = captures.get(POS_NAME)?.as_str().to_owned();
+        let last_modified = captures.get(POS_DATE)?.as_str().to_owned();
+        let size = captures.get(POS_SIZE)?.as_str().to_owned();
+        let description = captures.get(POS_DESC)?.as_str().to_owned();
+
+        // Check if the result is a directory (by examining its stated size)
+        if captures.get(POS_SIZE)?.as_str() == EMPTY_SIZE_STRING {
+            // TODO re-introduce count
+            // println!("Got directory ({:4}): {}", nodes.len(), &name);
+            println!("Got directory: {}", &name);
+
+            Some(Node::PendingDir(DirLinkMetaData {
+                url: href,
+                name,
+                last_modified,
+                description,
+            }))
+        } else {
+            clean_url(&mut href);
+
+            // TODO re-introduce count
+            // println!("Got file ({:4}): {}", nodes.len(), &name);
+            println!("Got file: {}", &name);
+            println!("{}\n", &href);
+
+            Some(Node::File(FileLinkMetaData {
+                url: href,
+                name,
+                last_modified,
+                size,
+                description,
+            }))
+        }
+    })
+
+    // unimplemented!()
 }
 
 /**
@@ -241,7 +339,7 @@ pub async fn get_root_dir(url: &Url, client: &reqwest::Client) -> Result<Node> {
 
     println!("Crawling root URL");
 
-    let root_data = extract_from_html(&res, url)?;
+    let root_data = cheap_extract_from_html(&res, url)?;
 
     Ok(Node::CrawledDir(
         DirLinkMetaData {

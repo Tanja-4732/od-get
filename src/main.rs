@@ -1,6 +1,9 @@
+// For internal use within the CLI application only
 pub(crate) mod cli;
 pub(crate) mod constants;
-pub(crate) mod download;
+
+// Export as a library
+pub mod download;
 
 use anyhow::Result;
 use download::{
