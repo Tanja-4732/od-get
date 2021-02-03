@@ -20,6 +20,26 @@ Parses a given HTML-string and extracts the directory and file paths.
 
 Returns a tuple containing the extracted name and the vector of extracted nodes.
 */
+pub fn cheap_extract_from_html(html_string: &str, base_url: &Url) -> Result<(String, Vec<Node>)> {
+    unimplemented!()
+}
+
+/**
+Turns an ElementRef (of a HTML table-row into a node (Either PendingDir or File)
+*/
+fn cheap_process_row(row: String, base_url: &Url) -> Result<Node> {
+    unimplemented!()
+}
+
+/**
+Parses a given HTML-string and extracts the directory and file paths.
+
+-  Not recursive
+-  Does not make requests
+
+Returns a tuple containing the extracted name and the vector of extracted nodes.
+*/
+#[deprecated]
 pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<(String, Vec<Node>)> {
     // let temp_url = Url::parse("/").expect("Invalid base");
     // let base_url = base_url.unwrap_or(&temp_url);
@@ -68,6 +88,7 @@ pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<(String, V
         // tokio::spawn(async move { // Multi-threaded open
         let mut batch_out = vec![];
         for row in batch {
+            print!("({:4}) ", nodes.len() + batch_out.len());
             batch_out.push(process_row(row, &base_url)?);
         }
         nodes.append(&mut batch_out);
@@ -80,6 +101,7 @@ pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<(String, V
 /**
 Turns an ElementRef (of a HTML table-row into a node (Either PendingDir or File)
 */
+#[deprecated]
 fn process_row(row: ElementRef, base_url: &Url) -> Result<Node> {
     // Get an iterator over the elements of the row
     let mut row = row.children().skip(1);
@@ -181,7 +203,7 @@ pub async fn expand_node(nodes: &mut Vec<Node>, client: &reqwest::Client) -> Res
             };
 
             // Perse the response
-            match extract_from_html(&html, &dir.url) {
+            match cheap_extract_from_html(&html, &dir.url) {
                 Err(err) => bail!(err),
                 Ok(dir_data) => {
                     // Replace the PendingDir node with a CrawledDir one
