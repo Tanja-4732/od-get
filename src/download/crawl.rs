@@ -1,7 +1,7 @@
 use super::types::{DirLinkMetaData, FileLinkMetaData, Node};
 use anyhow::{bail, Result};
 use reqwest::{self, Url};
-use scraper::{Html, Selector};
+use scraper::{ElementRef, Html, Selector};
 // use serde::Serialize;
 
 // Make-shift errors
@@ -45,92 +45,123 @@ pub fn extract_from_html(html_string: &str, base_url: &Url) -> Result<(String, V
 
     let mut nodes = vec![];
 
-    // Iterate over every row
-    for row in document.select(row_selector) {
-        // Get an iterator over the elements of the row
-        let mut row = row.children().skip(1);
+    // Match all rows
+    let mut selected = document.select(row_selector);
 
-        let a = match row.next() {
-            Some(element) => element.first_child().unwrap(),
-            None => break,
-        };
+    // Group the rows in 100-long batches
+    let mut run = true;
+    while run {
+        let mut batch = vec![];
 
-        let mut href = base_url
-            .join(a.value().as_element().unwrap().attr("href").unwrap())
-            .to_owned()?;
-
-        // clean_url(&mut href);
-
-        let name = a
-            .first_child()
-            .unwrap()
-            .value()
-            .as_text()
-            .unwrap()
-            .to_string();
-
-        let last_modified = row
-            .next()
-            .unwrap()
-            .first_child()
-            .unwrap()
-            .value()
-            .as_text()
-            .unwrap()
-            .to_string();
-
-        let size = row
-            .next()
-            .unwrap()
-            .first_child()
-            .unwrap()
-            .value()
-            .as_text()
-            .unwrap()
-            .to_string();
-
-        let description = row
-            .next()
-            .unwrap()
-            .first_child()
-            .unwrap()
-            .value()
-            .as_text()
-            .unwrap()
-            .to_string();
-
-        // Check if the result is a directory
-        if size == EMPTY_SIZE_STRING {
-            println!("Got directory ({:4}): {}", nodes.len(), &name);
-
-            nodes.push(Node::PendingDir(DirLinkMetaData {
-                url: href,
-                name,
-                last_modified,
-                description,
-            }))
-        } else {
-            clean_url(&mut href);
-
-            println!("Got file ({:4}): {}", nodes.len(), &name);
-            println!("{}\n", &href);
-
-            nodes.push(Node::File(FileLinkMetaData {
-                url: href,
-                name,
-                last_modified,
-                size,
-                description,
-            }))
+        while let Some(next) = selected.next() {
+            if batch.len() == 100 {
+                break;
+            } else {
+                batch.push(next);
+            }
         }
 
-        // TODO remove this
-        if nodes.len() == 20 {
-            break;
+        // Check, if the loop should run again
+        run = batch.len() != 0;
+
+        // TODO Make multi-threaded
+        // tokio::spawn(async move { // Multi-threaded open
+        let mut batch_out = vec![];
+        for row in batch {
+            batch_out.push(process_row(row, &base_url)?);
         }
+        nodes.append(&mut batch_out);
+        // }); // Multi-threaded close
     }
 
     Ok((dir_name, nodes))
+}
+
+/**
+Turns an ElementRef (of a HTML table-row into a node (Either PendingDir or File)
+*/
+fn process_row(row: ElementRef, base_url: &Url) -> Result<Node> {
+    // Get an iterator over the elements of the row
+    let mut row = row.children().skip(1);
+
+    let a = match row.next() {
+        Some(element) => element.first_child().unwrap(),
+        // None => break,
+        None => bail!("No next element"),
+    };
+
+    let mut href = base_url
+        .join(a.value().as_element().unwrap().attr("href").unwrap())
+        .to_owned()?;
+
+    // clean_url(&mut href);
+
+    let name = a
+        .first_child()
+        .unwrap()
+        .value()
+        .as_text()
+        .unwrap()
+        .to_string();
+
+    let last_modified = row
+        .next()
+        .unwrap()
+        .first_child()
+        .unwrap()
+        .value()
+        .as_text()
+        .unwrap()
+        .to_string();
+
+    let size = row
+        .next()
+        .unwrap()
+        .first_child()
+        .unwrap()
+        .value()
+        .as_text()
+        .unwrap()
+        .to_string();
+
+    let description = row
+        .next()
+        .unwrap()
+        .first_child()
+        .unwrap()
+        .value()
+        .as_text()
+        .unwrap()
+        .to_string();
+
+    // Check if the result is a directory
+    if size == EMPTY_SIZE_STRING {
+        // TODO re-introduce count
+        // println!("Got directory ({:4}): {}", nodes.len(), &name);
+        println!("Got directory: {}", &name);
+
+        Ok(Node::PendingDir(DirLinkMetaData {
+            url: href,
+            name,
+            last_modified,
+            description,
+        }))
+    } else {
+        clean_url(&mut href);
+
+        // TODO re-introduce count
+        // println!("Got file ({:4}): {}", nodes.len(), &name);
+        println!("Got file: {}", &name);
+        println!("{}\n", &href);
+
+        Ok(Node::File(FileLinkMetaData {
+            url: href,
+            name,
+            last_modified,
+            size,
+            description,
+        }))
+    }
 }
 
 /**
