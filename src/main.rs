@@ -5,14 +5,14 @@ pub(crate) mod constants;
 // Export as a library
 pub mod download;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use download::{
     crawl,
     fetch::{self, DownloadRecursiveStatus},
     types::{CrawlingState, Node, StateStore},
 };
 use fs::write;
-use std::{any::Any, fs};
+use std::{any::Any, convert::TryInto, fs};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -39,8 +39,13 @@ async fn main() -> Result<()> {
     let client = reqwest::Client::new();
 
     // Crawl the root directory
-    let (mut state_store, state_path) = if let Some(state_path) = cli_options.state_store.clone() {
+    let (mut state_store, state_path, mut done_list) = if let Some(state_path) =
+        cli_options.state_store.clone()
+    {
         // A state store is desired
+
+        // Make a new done list
+        let mut done_list: Vec<String> = vec![];
 
         // Try to load the state store from the file system
         let mut state_store: StateStore =
@@ -49,7 +54,7 @@ async fn main() -> Result<()> {
 
         // Return the pre-made crawl list or start crawling
         match state_store.crawling_state {
-            CrawlingState::Complete(_) => (state_store, Some(state_path)),
+            CrawlingState::Complete(_) => (state_store, Some(state_path), done_list),
             CrawlingState::Partial(_) | CrawlingState::None => {
                 // Perform the crawl
                 // TODO utilize partial crawls in the future
@@ -74,11 +79,14 @@ async fn main() -> Result<()> {
                     .expect("Cannot write to state store");
 
                 // Return the crawl results
-                (state_store, Some(state_path))
+                (state_store, Some(state_path), done_list)
             }
         }
     } else {
         // No state store is desired
+        // Make a new done list
+        let mut done_list: Vec<String> = vec![];
+
         // Make a phantom state store (not persisted)
         let mut state_store = StateStore::new();
 
@@ -94,21 +102,24 @@ async fn main() -> Result<()> {
         // Save the completed crawl
         state_store.crawling_state = CrawlingState::Complete(root.clone());
 
-        (state_store, None)
+        (state_store, None, done_list)
     };
 
     // TODO implement the counters
     let mut counters = download::fetch::LimitCounts::new();
     let mut counters_1 = counters.clone();
 
-    let res = fetch::download_recursive(
-        state_store.get_root_ref()?,
-        &cli_options,
-        &client,
-        &mut counters_1,
-        &mut state_store.downloaded_urls,
-    )
-    .await?;
+    // TODO remove `unsafe` when I have too much time in my life
+    let res = {
+        fetch::download_recursive(
+            state_store.get_root_ref()?,
+            &cli_options,
+            &client,
+            &mut counters_1,
+            &mut done_list,
+        )
+        .await?
+    };
 
     // let mut counters = counters.clone();
 
@@ -124,23 +135,36 @@ async fn main() -> Result<()> {
             let (node, options, client) = task;
             // TODO implement more than one level of recursion
             // res = fetch::download_recursive(node, options, client, &mut counters).await?;
-            match fetch::download_recursive(
-                node,
-                options,
-                client,
-                &mut counters,
-                &mut state_store.downloaded_urls,
-            )
-            .await
+            match fetch::download_recursive(node, options, client, &mut counters, &mut done_list)
+                .await
             {
                 Ok(_) => {}
-                Err(_) => {}
+                Err(error) => {
+                    // if let Some(state_path) = state_path {
+                    //     // Update the modified time
+                    //     state_store.update_modified_time();
+
+                    //     // Update the done_list
+                    //     state_store.downloaded_urls = done_list;
+
+                    //     // Serialize & persist the new state store
+                    //     fs::write(state_path, serde_json::to_string_pretty(&state_store)?)
+                    //         .expect("Cannot write to state store");
+                    // }
+
+                    // Return the error and halt execution
+                    bail!(error)
+                }
             }
         }
     }
+
     if let Some(state_path) = state_path {
         // Update the modified time
         state_store.update_modified_time();
+
+        // Update the done_list
+        state_store.downloaded_urls = done_list;
 
         // Serialize & persist the new state store
         fs::write(state_path, serde_json::to_string_pretty(&state_store)?)
