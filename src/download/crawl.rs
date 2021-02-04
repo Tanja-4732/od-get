@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use super::types::{DirLinkMetaData, FileLinkMetaData, Node};
 use anyhow::{anyhow, bail, Result};
 use html_escape::{decode_html_entities_to_string, decode_html_entities_to_vec};
@@ -100,7 +102,7 @@ pub fn cheap_process_row<'a>(
             println!("Got directory: {}", &name);
 
             Some(Node::PendingDir(DirLinkMetaData {
-                url: href,
+                url: href.to_string(),
                 name,
                 last_modified,
                 description,
@@ -114,7 +116,7 @@ pub fn cheap_process_row<'a>(
             println!("{}\n", &href);
 
             Some(Node::File(FileLinkMetaData {
-                url: href,
+                url: href.to_string(),
                 name,
                 last_modified,
                 size,
@@ -258,7 +260,7 @@ fn process_row(row: ElementRef, base_url: &Url) -> Result<Node> {
         println!("Got directory: {}", &name);
 
         Ok(Node::PendingDir(DirLinkMetaData {
-            url: href,
+            url: href.to_string(),
             name,
             last_modified,
             description,
@@ -272,7 +274,7 @@ fn process_row(row: ElementRef, base_url: &Url) -> Result<Node> {
         println!("{}\n", &href);
 
         Ok(Node::File(FileLinkMetaData {
-            url: href,
+            url: href.to_string(),
             name,
             last_modified,
             size,
@@ -289,7 +291,7 @@ pub async fn expand_node(nodes: &mut Vec<Node>, client: &reqwest::Client) -> Res
         // Only crawl if needed
         if let Node::PendingDir(dir) = node {
             println!("Now crawling: {}", dir.name);
-            let req = client.get(dir.url.clone()).send();
+            let req = client.get(&dir.url).send();
 
             // Get the HTML from the server
             let html = match req.await {
@@ -298,7 +300,7 @@ pub async fn expand_node(nodes: &mut Vec<Node>, client: &reqwest::Client) -> Res
             };
 
             // Perse the response
-            match cheap_extract_from_html(&html, &dir.url) {
+            match cheap_extract_from_html(&html, &Url::from_str(&dir.url)?) {
                 Err(err) => bail!(err),
                 Ok(dir_data) => {
                     // Replace the PendingDir node with a CrawledDir one
@@ -343,7 +345,7 @@ pub async fn get_root_dir(url: &Url, client: &reqwest::Client) -> Result<Node> {
 
     Ok(Node::CrawledDir(
         DirLinkMetaData {
-            url: url.clone(),
+            url: url.to_string(),
             name: root_data.0,
             description: String::new(),
             last_modified: String::new(),

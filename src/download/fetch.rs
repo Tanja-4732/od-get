@@ -2,7 +2,7 @@ use crate::cli::CliOptions;
 
 use super::types;
 use anyhow::{bail, Result};
-use std::{future::Future, path::Path};
+use std::{future::Future, path::Path, str::FromStr};
 use types::Node;
 // use chrono::prelude::Utc;
 use reqwest::{self, Url};
@@ -38,9 +38,16 @@ pub async fn download_files_to_dir(
     client: &reqwest::Client,
     options: Option<&CliOptions>,
     mut counters: Option<&mut LimitCounts>,
+    done_list: &mut Vec<String>,
 ) -> Result<()> {
     for file in files {
-        let last_segment = get_last_segment(&file.url);
+        let temp = Url::from_str(&file.url)?;
+        let last_segment = get_last_segment(&temp);
+
+        if done_list.contains(&file.url) {
+            println!("(StateStore) Already have file {}", last_segment);
+            return Ok(());
+        }
 
         // Follow options (if specified)
         if let Some(options) = options {
@@ -113,6 +120,9 @@ pub async fn download_files_to_dir(
         while let Some(chunk) = res.chunk().await? {
             file_handle.write_all(&chunk).await?;
         }
+
+        // Append the file URL to the done_list
+        done_list.push(file.url.clone());
     }
 
     Ok(())
@@ -123,6 +133,7 @@ pub async fn download_recursive<'a>(
     options: &'a CliOptions,
     client: &'a reqwest::Client,
     counters: &'a mut LimitCounts,
+    done_list: &mut Vec<String>,
 ) -> Result<DownloadRecursiveStatus<'a>> {
     // ) -> Box<dyn Future<Output = ()>> {
     // Pin<Box<dyn Future<Output = Result<()>>>>
@@ -191,7 +202,15 @@ pub async fn download_recursive<'a>(
         }
 
         // Download all the files (if they pass the filters)
-        download_files_to_dir(&folder_path, &files, client, Some(options), Some(counters)).await?;
+        download_files_to_dir(
+            &folder_path,
+            &files,
+            client,
+            Some(options),
+            Some(counters),
+            done_list,
+        )
+        .await?;
 
         // A list of tuples containing arguments which which this function should be called again
         let mut to_do = vec![];
@@ -220,7 +239,7 @@ pub async fn download_recursive<'a>(
                 // Start the next recursive iteration
                 to_do.push((directory, options, client));
             } else if let Node::PendingDir(directory) = directory {
-                let mut url = directory.url.clone();
+                let mut url = Url::from_str(&directory.url)?;
                 url.path_segments_mut()
                     .unwrap()
                     // TODO improve this somehow

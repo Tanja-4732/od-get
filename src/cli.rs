@@ -17,6 +17,7 @@ pub struct CliOptions {
     pub path_filter: Option<Regex>,
     pub file_matcher: Option<Regex>,
     pub path_matcher: Option<Regex>,
+    pub state_store: Option<String>,
 }
 
 pub fn configure_parser(default_path: &str) -> App {
@@ -34,7 +35,8 @@ pub fn configure_parser(default_path: &str) -> App {
                 .help("The path to which to write the downloaded files to")
                 .default_value(default_path)
                 .short("d")
-                .long("destination"),
+                .long("destination")
+                .value_name("path"),
             Arg::with_name("disable download")
                 .help("Crawls without downloading (only writes json)")
                 .short("j")
@@ -47,37 +49,50 @@ pub fn configure_parser(default_path: &str) -> App {
                 .help("Limit to n finding(s) to be downloaded")
                 .short("l")
                 .long("limit")
+                .value_name("integer")
                 .default_value("0"),
             Arg::with_name("skip")
                 .help("Skip the first n finding(s)")
                 .short("s")
                 .long("skip")
+                .value_name("integer")
                 .default_value("0"),
             Arg::with_name("max_depth")
                 .help("Maximum recursion depth (0 is unlimited)")
                 .short("r")
                 .long("recursive-depth")
+                .value_name("integer")
                 .default_value("0"),
             Arg::with_name("file_filter")
                 .takes_value(true)
                 .help("Regex filter to exclude matching file names")
                 .short("f")
-                .long("file-filter"),
+                .long("file-filter")
+                .value_name("regex"),
             Arg::with_name("path_filter")
                 .takes_value(true)
                 .help("Regex filter to exclude matching paths names")
                 .short("p")
-                .long("path-filter"),
+                .long("path-filter")
+                .value_name("regex"),
             Arg::with_name("file_matcher")
                 .takes_value(true)
                 .help("Regex filter to exclude non-matching file names")
                 .short("F")
-                .long("file-matcher"),
+                .long("file-matcher")
+                .value_name("regex"),
             Arg::with_name("path_matcher")
                 .takes_value(true)
                 .help("Regex filter to exclude non-matching paths names")
                 .short("P")
-                .long("path-matcher"),
+                .long("path-matcher")
+                .value_name("regex"),
+            Arg::with_name("state_store")
+                .takes_value(true)
+                .help("Store progress in a file (and resume when possible)")
+                .short("S")
+                .long("store-state")
+                .value_name("path"),
         ]);
 
     app
@@ -103,6 +118,7 @@ pub fn get_options(matches: ArgMatches) -> Result<CliOptions, anyhow::Error> {
         path_filter: make_regex("path_filter"),
         file_matcher: make_regex("file_matcher"),
         path_matcher: make_regex("path_matcher"),
+        state_store: matches.value_of("state_store").map(|path| path.to_owned()),
     })
 }
 
