@@ -1,6 +1,6 @@
 # od-get
 
-[![dependency status](https://deps.rs/crate/od-get/0.1.0/status.svg)](https://deps.rs/crate/od-get/0.1.0)
+[![dependency status](https://deps.rs/crate/od-get/0.2.0/status.svg)](https://deps.rs/crate/od-get/0.2.0)
 
 A Rust tool for recursively crawling & downloading data from [open directories](https://www.vice.com/en/article/d35x57/what-are-open-directories)
 
@@ -12,13 +12,15 @@ A Rust tool for recursively crawling & downloading data from [open directories](
 - [x] Customizable output
   - [x] Target directory
   - [ ] Verbosity
-  - [ ] JSON file generation
+  - [x] Metadata-JSON file generation
   - [ ] Log file/dynamic terminal output
 - [ ] Customizable limits
   - [ ] recursion depth limit
   - [ ] file count limit
   - [ ] file count offset (skip `n` files)
 - [x] Multi threaded (using `rayon`)
+- [x] Resume on error (avoid re-downloading files)
+- [ ] Multi-level recursion
 
 (work in progress, one layer of recursion works)
 
