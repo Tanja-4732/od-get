@@ -111,8 +111,8 @@ pub async fn download_files_to_dir(
 
         // Use Tokio to open the target file
         let mut file_handle = fs::OpenOptions::new()
+            .write(true)
             .create(true)
-            .append(true)
             .open(&file_path)
             .await?;
 
@@ -217,7 +217,7 @@ pub async fn download_recursive<'a>(
 
         // Iterate over the sub directories
         for directory in children {
-            if let Node::CrawledDir(sub_meta, _) = directory {
+            if let Node::CrawledDir(_, _) = directory {
                 // Stop if the recursion limit is reached
                 if let Some(rec_limit) = options.recursion_limit {
                     if counters.recursion_depth >= rec_limit {
