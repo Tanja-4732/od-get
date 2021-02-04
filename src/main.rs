@@ -140,17 +140,17 @@ async fn main() -> Result<()> {
             {
                 Ok(_) => {}
                 Err(error) => {
-                    // if let Some(state_path) = state_path {
-                    //     // Update the modified time
-                    //     state_store.update_modified_time();
+                    if let Some(state_path) = state_path {
+                        // Update the modified time
+                        state_store.update_modified_time();
 
-                    //     // Update the done_list
-                    //     state_store.downloaded_urls = done_list;
+                        // Update the done_list
+                        state_store.downloaded_urls = done_list;
 
-                    //     // Serialize & persist the new state store
-                    //     fs::write(state_path, serde_json::to_string_pretty(&state_store)?)
-                    //         .expect("Cannot write to state store");
-                    // }
+                        // Serialize & persist the new state store
+                        fs::write(state_path, serde_json::to_string_pretty(&state_store)?)
+                            .expect("Cannot write to state store");
+                    }
 
                     // Return the error and halt execution
                     bail!(error)
