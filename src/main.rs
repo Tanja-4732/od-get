@@ -35,14 +35,17 @@ async fn main() -> Result<()> {
     let client = reqwest::Client::new();
 
     // Crawl the root directory
-    let mut root = crawl::get_root_dir(&cli_options.url, &client).await?;
+    let root = {
+        let mut root = crawl::get_root_dir(&cli_options.url, &client).await?;
 
-    // Expand the tree
-    if let Node::CrawledDir(_, ref mut children) = root {
-        crawl::expand_node(children, &client).await?;
-    } else {
-        panic!("Cannot expand root node")
-    }
+        // Expand the tree
+        if let Node::CrawledDir(_, ref mut children) = root {
+            crawl::expand_node(children, &client).await?;
+        } else {
+            panic!("Cannot expand root node")
+        }
+        root
+    };
 
     let mut counters = download::fetch::LimitCounts::new();
 
