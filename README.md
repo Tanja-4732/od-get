@@ -21,6 +21,7 @@ A Rust tool for recursively crawling & downloading data from [open directories](
 - [x] Multi threaded (using `rayon`)
 - [x] Resume on error (avoid re-downloading files)
 - [ ] Multi-level recursion
+- [x] Disable download (only crawl to JSON)
 
 (work in progress, one layer of recursion works)
 

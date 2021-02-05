@@ -30,16 +30,15 @@ async fn main() -> Result<()> {
     println!("{}\n", constants::LICENSE);
 
     // Try to extract the desired configuration from the arg-matches
-    let cli_options = cli::get_options(matches).expect(
-        "Invalid arguments (skip & limit must be numbers and the working directory must exist)",
-    );
+    let cli_options = cli::get_options(matches)?;
 
     // Make a new client for issuing HTTP(S) requests
     let client = reqwest::Client::new();
 
     // Crawl the root directory
+    // TODO extract to `setup` or `crawl` function
     let (mut state_store, state_path, mut done_list) = if let Some(state_path) =
-        cli_options.state_store.clone()
+        cli_options.state_store_path.clone()
     {
         // A state store is desired
 
@@ -84,6 +83,11 @@ async fn main() -> Result<()> {
     } else {
         // No state store is desired
 
+        // Check if --no-download was specified
+        if cli_options.no_download {
+            bail!("Cannot use --no-download without --state-store")
+        }
+
         // Make a phantom state store (not persisted)
         let mut state_store = StateStore::new();
 
@@ -102,50 +106,61 @@ async fn main() -> Result<()> {
         (state_store, None, vec![])
     };
 
-    // TODO implement the counters
-    let mut counters = download::fetch::LimitCounts::new();
-    let mut counters_1 = counters.clone();
+    // Only download files if --no-download was not specified
+    // TODO extract to `download_files` function
+    if !cli_options.no_download {
+        // TODO implement the counters
+        let mut counters = download::fetch::LimitCounts::new();
+        let mut counters_1 = counters.clone();
 
-    let res = {
-        fetch::download_recursive(
-            state_store.get_root_ref()?,
-            &cli_options,
-            &client,
-            &mut counters_1,
-            &mut done_list,
-        )
-        .await?
-    };
+        let res = {
+            fetch::download_recursive(
+                state_store.get_root_ref()?,
+                &cli_options,
+                &client,
+                &mut counters_1,
+                &mut done_list,
+            )
+            .await?
+        };
 
-    if let DownloadRecursiveStatus::Do(ref to_do) = res {
-        for task in to_do {
-            let (node, options, client) = task;
-            // TODO implement more than one level of recursion
-            // res = fetch::download_recursive(node, options, client, &mut counters).await?;
-            match fetch::download_recursive(node, options, client, &mut counters, &mut done_list)
+        if let DownloadRecursiveStatus::Do(ref to_do) = res {
+            for task in to_do {
+                let (node, options, client) = task;
+                // TODO implement more than one level of recursion
+                // res = fetch::download_recursive(node, options, client, &mut counters).await?;
+                match fetch::download_recursive(
+                    node,
+                    options,
+                    client,
+                    &mut counters,
+                    &mut done_list,
+                )
                 .await
-            {
-                Ok(_) => {}
-                Err(error) => {
-                    if let Some(state_path) = state_path {
-                        // Update the modified time
-                        state_store.update_modified_time();
+                {
+                    Ok(_) => {}
+                    Err(error) => {
+                        if let Some(state_path) = state_path {
+                            // Update the modified time
+                            state_store.update_modified_time();
 
-                        // Update the done_list
-                        state_store.downloaded_urls = done_list;
+                            // Update the done_list
+                            state_store.downloaded_urls = done_list;
 
-                        // Serialize & persist the new state store
-                        fs::write(state_path, serde_json::to_string_pretty(&state_store)?)
-                            .expect("Cannot write to state store");
+                            // Serialize & persist the new state store
+                            fs::write(state_path, serde_json::to_string_pretty(&state_store)?)
+                                .expect("Cannot write to state store");
+                        }
+
+                        // Return the error and halt execution
+                        bail!(error)
                     }
-
-                    // Return the error and halt execution
-                    bail!(error)
                 }
             }
         }
     }
 
+    // TODO extract to `write_state` function
     if let Some(state_path) = state_path {
         // Update the modified time
         state_store.update_modified_time();
@@ -160,7 +175,7 @@ async fn main() -> Result<()> {
         println!("Wrote state store to {}", &state_path);
     }
 
-    println!("Download done.");
+    println!("All done.");
 
     Ok(())
 }

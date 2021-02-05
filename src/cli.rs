@@ -17,7 +17,7 @@ pub struct CliOptions {
     pub path_filter: Option<Regex>,
     pub file_matcher: Option<Regex>,
     pub path_matcher: Option<Regex>,
-    pub state_store: Option<String>,
+    pub state_store_path: Option<String>,
 }
 
 pub fn configure_parser(default_path: &str) -> App {
@@ -38,9 +38,9 @@ pub fn configure_parser(default_path: &str) -> App {
                 .long("destination")
                 .value_name("path"),
             Arg::with_name("disable download")
-                .help("Crawls without downloading (only writes json)")
-                .short("j")
-                .long("json-without-download"),
+                .help("Crawls without downloading (you mut also use -S)")
+                .short("n")
+                .long("no-download"),
             Arg::with_name("verbosity")
                 .short("v")
                 .multiple(true)
@@ -118,7 +118,7 @@ pub fn get_options(matches: ArgMatches) -> Result<CliOptions, anyhow::Error> {
         path_filter: make_regex("path_filter"),
         file_matcher: make_regex("file_matcher"),
         path_matcher: make_regex("path_matcher"),
-        state_store: matches.value_of("state_store").map(|path| path.to_owned()),
+        state_store_path: matches.value_of("state_store").map(|path| path.to_owned()),
     })
 }
 
