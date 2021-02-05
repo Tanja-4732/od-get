@@ -1,6 +1,6 @@
 # od-get
 
-[![dependency status](https://deps.rs/crate/od-get/0.3.0/status.svg)](https://deps.rs/crate/od-get/0.3.0)
+[![dependency status](https://deps.rs/crate/od-get/0.3.1/status.svg)](https://deps.rs/crate/od-get/0.3.1)
 
 A Rust tool for recursively crawling & downloading data from [open directories](https://www.vice.com/en/article/d35x57/what-are-open-directories)
 
