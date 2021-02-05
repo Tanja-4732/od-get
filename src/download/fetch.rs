@@ -2,12 +2,10 @@ use crate::cli::CliOptions;
 
 use super::types;
 use anyhow::{bail, Result};
-use std::{future::Future, path::Path, str::FromStr};
-use types::Node;
-// use chrono::prelude::Utc;
 use reqwest::{self, Url};
-// use serde::Serialize;
+use std::{path::Path, str::FromStr};
 use tokio::{fs, io::AsyncWriteExt};
+use types::Node;
 
 /// Several counter variables used to keep track of limits
 #[derive(Debug, Clone)]
@@ -270,7 +268,6 @@ pub async fn download_recursive<'a>(
 }
 
 /// Returns a reference to the last segment of a given URL as a &str
-#[deprecated]
 fn get_last_segment(url: &Url) -> &str {
     url.path_segments()
         .and_then(|segments| segments.last())
