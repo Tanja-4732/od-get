@@ -160,22 +160,34 @@ async fn main() -> Result<()> {
         }
     }
 
-    // TODO extract to `write_state` function
+    // Persist the new state to disk if necessary
     if let Some(state_path) = state_path {
-        // Update the modified time
-        state_store.update_modified_time();
-
-        // Update the done_list
-        state_store.downloaded_urls = done_list;
-
-        // Serialize & persist the new state store
-        fs::write(&state_path, serde_json::to_string_pretty(&state_store)?)
-            .expect("Cannot write to state store");
-
-        println!("Wrote state store to {}", &state_path);
+        write_state(&mut state_store, &state_path, done_list)?;
+        println!("Download done.");
+    } else {
+        println!("All done.");
     }
 
-    println!("All done.");
+    Ok(())
+}
+
+/// Persists the state to disk
+fn write_state(
+    state_store: &mut StateStore,
+    state_path: &str,
+    done_list: Vec<String>,
+) -> Result<()> {
+    // Update the modified time
+    state_store.update_modified_time();
+
+    // Update the done_list
+    state_store.downloaded_urls = done_list;
+
+    // Serialize & persist the new state store
+    fs::write(state_path, serde_json::to_string_pretty(&state_store)?)
+        .expect("Cannot write to state store");
+
+    println!("Wrote state store to {}", state_path);
 
     Ok(())
 }
