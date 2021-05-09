@@ -102,7 +102,7 @@ pub fn get_options(matches: ArgMatches) -> Result<CliOptions, anyhow::Error> {
     let make_regex = |name: &str| {
         matches.value_of(name).and_then(|v| match Regex::new(v) {
             Ok(regex) => Some(regex),
-            Err(err) => panic!(&format!("{:?}", err)),
+            Err(err) => panic!("{}", &format!("{:?}", err)),
         })
     };
 
